@@ -165,24 +165,9 @@ def run_train(args):
 
     return y_test, y_test_probability, y_pred, test_pred
 
-# 输出文件
-def save_data(args, **kwargs):
-    c = args['C']
-    kernel = args['kernel']
-    is_report = args['is_print_report']
-    is_pred = args['is_print_pred']
-    y_test = kwargs['y_test']
-    y_pred = kwargs['y_pred']
-    test_pred = kwargs['test_pred']
-
-    if is_report:
-        write_report(c, kernel, y_test, y_pred)
-
-    if is_pred:
-        write_pred(c, kernel, test_pred)
-
 
 def run_model(args):
+    is_roc = args['is_graph_roc']
     te_co = args['test_col']
     te_da = args['test_data']
     te_si = 0.0
@@ -217,16 +202,18 @@ def run_model(args):
 
     # 绘制ROC
     ## 获得得分
-    y_test_probability = svclassifier.decision_function(X_test)
+    y_test_probability = None
+    if is_roc:
+        y_test_probability = svclassifier.decision_function(X_test)
     # print(y_test_probability)
 
     ## 获得真假率
-    fpr, tpr, threshold = roc_curve(y_test, y_test_probability)
+    # fpr, tpr, threshold = roc_curve(y_test, y_test_probability)
     # print(fpr)
     # print(tpr)
     # print(threshold)
 
-    # 预测评估
+    # 预测
     y_pred = svclassifier.predict(X_test)
     test_pred = svclassifier.predict(pre_data)
 
@@ -261,11 +248,37 @@ def run_model(args):
     # file.close()
 
 
-    return y_test, y_test_probability, y_pred, test_pred, fpr, tpr, threshold
+    return y_test, y_test_probability, y_pred, test_pred
+
+
+# 输出文件
+def save_data(args, **kwargs):
+    c = args['C']
+    kernel = args['kernel']
+    is_report = args['is_print_report']
+    is_pred = args['is_print_pred']
+    is_train = args['is_train']
+    model_name = args['model_name']
+    y_test = kwargs['y_test']
+    y_pred = kwargs['y_pred']
+    test_pred = kwargs['test_pred']
+
+    if is_report:
+        write_report(c, kernel, y_test, y_pred, is_train, model_name)
+
+    if is_pred:
+        write_pred(c, kernel, test_pred, is_train, model_name)
+
+
 
 # 保存验证数据产生的报告，反应模型情况
-def write_report(c, kernel, y_test, y_pred):
-    file = open(RESULT_REPORT_PATH + str(c) + '_' + kernel + '_Report__' + PRESENT_TIME + '.txt', 'w')
+def write_report(c, kernel, y_test, y_pred, is_train, model_name):
+
+    if is_train:
+        file = open(RESULT_REPORT_PATH + str(c) + '_' + kernel + '_Report__' + PRESENT_TIME + '.txt', 'w')
+    else:
+        file = open(RESULT_REPORT_PATH + '[' + model_name + ']_Report__' + PRESENT_TIME + '.txt', 'w')
+
     file.write(str(confusion_matrix(y_test, y_pred)))
     file.write('\n')
     file.write(str(classification_report(y_test, y_pred)))
@@ -274,8 +287,13 @@ def write_report(c, kernel, y_test, y_pred):
     file.close()
 
 # 保存测试数据分类结果
-def write_pred(c, kernel, test_pred):
-    file = open(RESULT_DATA_PATH + str(c) + '_' + kernel + '_Out__' + PRESENT_TIME + '.txt', 'w')
+def write_pred(c, kernel, test_pred, is_train, model_name):
+
+    if is_train:
+        file = open(RESULT_DATA_PATH + str(c) + '_' + kernel + '_Out__' + PRESENT_TIME + '.txt', 'w')
+    else:
+        file = open(RESULT_DATA_PATH + '[' + model_name + ']_Out__' + PRESENT_TIME + '.txt', 'w')
+
     file.write(str(test_pred))
     file.close()
 
@@ -283,22 +301,29 @@ def write_pred(c, kernel, test_pred):
 def show_graph(args, **kwargs):
     c = args['C']
     is_roc = args['is_graph_roc']
+    is_train = args['is_train']
     kernel = args['kernel']
+    model_name = args['model_name']
     y_te = kwargs['y_test']
     y_t_pr = kwargs['y_test_probability']
 
     if is_roc:
-        draw_roc(c, kernel, y_te, y_t_pr)
+        draw_roc(c, kernel, y_te, y_t_pr, is_train, model_name)
 
 # 绘图, ROC
-def draw_roc(c, kernel, y_test, y_test_probability):
+def draw_roc(c, kernel, y_test, y_test_probability, is_train, model_name):
 
     # 获得真假率
     fpr, tpr, threshold = roc_curve(y_test, y_test_probability)
 
     # 绘制
     plt.ion()  # 开启interactive mode 成功的关键函数
-    fig_name = RESULT_GRAPH_PATH + str(c) + '_' + kernel + "_ROC__" + PRESENT_TIME + '.png'
+
+    if is_train:
+        fig_name = RESULT_GRAPH_PATH + str(c) + '_' + kernel + "_ROC__" + PRESENT_TIME + '.png'
+    else:
+        fig_name = RESULT_GRAPH_PATH + '[' + model_name + ']_ROC__' + PRESENT_TIME + '.png'
+
     plt.figure(fig_name, figsize=(6, 6))
 
     # average time of each eat
