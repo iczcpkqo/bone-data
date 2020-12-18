@@ -1,4 +1,3 @@
-
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -8,82 +7,126 @@ from sklearn.svm import SVC
 from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.metrics import roc_curve, auc
 from sklearn.model_selection import train_test_split
+import joblib
 import numba as nb
 import sys
 
-def run():
-    s_sel = 2
-    big_C = 0.5
-    # threshold = 0.5
-    is_probility = True
+TRAIN_DATA = "./train_data/"
+RESULT_DATA_PATH = "./result_data/"
+RESULT_REPORT_PATH = "./result_report/"
+RESULT_GRAPH_PATH = "./result_graph/"
+MODEL_PATH = "./trained_model/"
+PRESENT_TIME = str(time.strftime("%Y-%m-%d %H.%M.%S", time.localtime()))
 
-    # Function Menu
-    is_draw_roc = True
+
+def run():
+    # setting
+    args = {'is_train': True,
+            'is_print_report': True,
+            'is_print_pred': True,
+            'is_save_model': True,
+            'is_probability': True,
+            'is_graph_roc': True,
+            'is_graph_auc': False,
+            'C': 0.5,
+            'test_size': 0.20,
+            'pause_time': 0.00,
+            'kernel': 'Sigmoid',
+            'model_name': '0.5_SV_Sigmoid__2020-12-18 00.59.51.m',
+            'train_data': 'train-io-tiny.txt',
+            'test_data': 'test-in-tiny.txt',
+            'train_col': ['D-1', 'D-2', 'D-3', 'D-4', 'D-5', 'D-6', 'D-7', 'D-8', 'D-9', 'D-10', 'D-11', 'D-12', 'class'],
+            'test_col': ['D-1', 'D-2', 'D-3', 'D-4', 'D-5', 'D-6', 'D-7', 'D-8', 'D-9', 'D-10', 'D-11', 'D-12']}
+
+    # get parameter
+    c = args['C']
 
     # for big_C in np.arange(0.1, 1.05, 0.1):
-    print(big_C)
+    print(c)
 
-    y_test, y_test_probility = run_case(s_sel, big_C, is_probility)
+    y_test, y_test_probability, y_pred, test_pred = run_train(args)
 
     # 绘制ROC
-    if is_draw_roc:
-        draw_roc(y_test, y_test_probility)
+    # draw_roc(args, y_test=y_test, y_test_probability=y_test_probability)
+    show_graph(args, y_test=y_test, y_test_probability=y_test_probability)
 
+    # 保存数据
+    save_data(args, y_test=y_test, y_pred=y_pred, test_pred=test_pred)
 
 # for i in range(2, 3):
     #     run_case(i,big_C)
 
-def run_case(is_sel, big_C, is_probility):
+    # c = args['C']
+    # kernel = args['kernel']
+    # is_report = args['is_print_report']
+    # is_pred = args['is_print_pred']
+    # y_test = kwargs['y_test']
+    # y_pred = kwargs['y_pred']
+    # test_pred = kwargs['test_pred']
+
+def run_train(args):
+    c = args['C']
+    te_co = args['test_col']
+    te_da = args['test_data']
+    te_si = args['test_size']
+    tr_co = args['train_col']
+    tr_da = args['train_data']
+    kernel = args['kernel']
+    proba = args['is_probability']
+
     # 数据
-    ## tiny data
-    url = "C:/codedomain/database/traindata/train-io-tiny.txt"
-    pre_url = "C:/codedomain/database/traindata/test-in-tiny.txt"
-    ## big data
-    # url = "C:/codedomain/database/traindata/train-io.txt"
-    # pre_url = "C:/codedomain/database/traindata/test-in.txt"
+    ## data
+    url = TRAIN_DATA + tr_da
+    pre_url = TRAIN_DATA + te_da
 
     # Assign colum names to the dataset
-    colnames = ['D-1', 'D-2', 'D-3', 'D-4', 'D-5', 'D-6', 'D-7', 'D-8', 'D-9', 'D-10', 'D-11', 'D-12', 'class']
-    pre_colnames = ['D-1', 'D-2', 'D-3', 'D-4', 'D-5', 'D-6', 'D-7', 'D-8', 'D-9', 'D-10', 'D-11', 'D-12']
+    colnames = tr_co
+    pre_colnames = te_co
 
     # Read dataset to pandas dataframe
-    train_data= pd.read_csv(url, names=colnames, sep=' ')
+    train_data = pd.read_csv(url, names=colnames, sep=' ')
     pre_data = pd.read_csv(pre_url, names=pre_colnames, sep=' ')
 
     # 预处理
-    X = train_data.drop('class', axis=1)
-    y = train_data['class']
+    X = train_data.drop(tr_co[-1], axis=1)
+    y = train_data[tr_co[-1]]
 
     # 分离数据
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=te_si)
 
     # 选分类器
     ## 高斯
-    if is_sel == 0:
-        print('Gau')
-        svclassifier = SVC(kernel='rbf', probability=is_probility, C=big_C)
+    if kernel == 'Gaussian':
+        print(kernel)
+        svclassifier = SVC(kernel='rbf', probability=proba, C=c)
 
     ## 多项式
-    if is_sel == 1:
-        print('Pol')
-        svclassifier = SVC(kernel='poly', probability=is_probility, degree=8, C=big_C)
+    if kernel == 'Polynomial':
+        print(kernel)
+        svclassifier = SVC(kernel='poly', probability=proba, degree=8, C=c)
         svclassifier.fit(X_train, y_train)
 
     ## sigmoid
-    if is_sel == 2:
-        print('Sig')
-        svclassifier = SVC(kernel='sigmoid', probability=is_probility, C=big_C)
+    if kernel == 'Sigmoid':
+        print(kernel)
+        svclassifier = SVC(kernel='sigmoid', probability=proba, C=c)
 
     # 训练
     svclassifier.fit(X_train, y_train)
 
+    # 保存模型
+    joblib.dump(svclassifier, MODEL_PATH + str(c) + '_SV_' + kernel + '__' + PRESENT_TIME + '.m')
+
     # 绘制ROC
     ## 获得得分
-    y_test_probility = svclassifier.decision_function(X_test)
-    # print(y_test_probility)
+    y_test_probability = svclassifier.decision_function(X_test)
+    # print(y_test_probability)
 
     ## 获得真假率
-    fpr, tpr, threshold = roc_curve(y_test, y_test_probility)
+    # fpr, tpr, threshold = roc_curve(y_test, y_test_probability)
+    # print(fpr)
+    # print(tpr)
+    # print(threshold)
 
     # 预测评估
     y_pred = svclassifier.predict(X_test)
@@ -94,60 +137,168 @@ def run_case(is_sel, big_C, is_probility):
     # pd.set_option('max_colwidth', 10000000)
     np.set_printoptions(threshold=sys.maxsize)
 
+
+    # print(fpr)
+    # print(tpr)
+    # print(threshold)
+
+    # fpr, tpr, threshold = roc_curve(y_test, y_pred)
     # print(confusion_matrix(y_test, y_pred))
     # print(classification_report(y_test, y_pred))
     # print(y_pred)
 
-    name_report_file = ''
-    name__file= ''
-    if is_sel == 0:
-        file = open(str(big_C) + '_Gaussin_Report.txt', 'w')
-        file.write(str(confusion_matrix(y_test, y_pred)))
-        file.write('\n')
-        file.write(str(classification_report(y_test, y_pred)))
-        file.write('\n')
-        file.write(str(y_pred))
-        file.close()
+    # name_report_file = ''
+    # name__file= ''
+    # if is_sel == 0:
+    # ======  ======  ======  ======  ======  ======  ======
+    # file = open(RESULT_REPORT_PATH + str(c) + '_' + kernel + '_Report__' + PRESENT_TIME + '.txt', 'w') file.write(str(confusion_matrix(y_test, y_pred)))
+    # file.write('\n')
+    # file.write(str(classification_report(y_test, y_pred)))
+    # file.write('\n')
+    # file.write(str(y_pred))
+    # file.close()
+    #
+    # file = open(RESULT_DATA_PATH + str(c) + '_' + kernel + '_Out__' + PRESENT_TIME + '.txt', 'w')
+    # file.write(str(test_pred))
+    # file.close()
 
-        file = open(str(big_C) + '_Gaussin_Out.txt', 'w')
-        file.write(str(test_pred))
-        file.close()
 
-    elif is_sel == 1:
-        file = open(str(big_C) + '_Polynomial_Report.txt', 'a')
-        file.write(str(confusion_matrix(y_test, y_pred)))
-        file.write('\n')
-        file.write(str(classification_report(y_test, y_pred)))
-        file.write('\n')
-        file.write(str(y_pred))
-        file.close()
+    return y_test, y_test_probability, y_pred, test_pred
 
-        file = open(str(big_C) + '_Polynomial_Out.txt', 'w')
-        file.write(str(test_pred))
-        file.close()
+# 输出文件
+def save_data(args, **kwargs):
+    c = args['C']
+    kernel = args['kernel']
+    is_report = args['is_print_report']
+    is_pred = args['is_print_pred']
+    y_test = kwargs['y_test']
+    y_pred = kwargs['y_pred']
+    test_pred = kwargs['test_pred']
 
-    elif is_sel == 2:
-        file = open(str(big_C) + '_Sigmoid_Report.txt', 'a')
-        file.write(str(confusion_matrix(y_test, y_pred)))
-        file.write('\n')
-        file.write(str(classification_report(y_test, y_pred)))
-        file.write('\n')
-        file.write(str(y_pred))
-        file.close()
+    if is_report:
+        write_report(c, kernel, y_test, y_pred)
 
-        file = open(str(big_C) + '_Sigmoid_Out.txt', 'w')
-        file.write(str(test_pred))
-        file.close()
-    return y_test, y_test_probility
+    if is_pred:
+        write_pred(c, kernel, test_pred)
 
-## 绘图, ROC
-def draw_roc(y_test, y_test_probility):
+
+def run_model(args):
+    te_co = args['test_col']
+    te_da = args['test_data']
+    te_si = 0.0
+    tr_co = args['train_col']
+    tr_da = args['train_data']
+    kernel = args['kernel']
+    proba = args['is_probability']
+    model_name = args['model_name']
+
+    # 数据
+    ## data
+    url = TRAIN_DATA + tr_da
+    pre_url = TRAIN_DATA + te_da
+
+    # Assign colum names to the dataset
+    colnames = tr_co
+    pre_colnames = te_co
+
+    # Read dataset to pandas dataframe
+    train_data = pd.read_csv(url, names=colnames, sep=' ')
+    pre_data = pd.read_csv(pre_url, names=pre_colnames, sep=' ')
+
+    # 预处理
+    X = train_data.drop(tr_co[-1], axis=1)
+    y = train_data[tr_co[-1]]
+
+    # 分离数据
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=te_si)
+
+    # 调用模型
+    svclassifier = joblib.load(MODEL_PATH + model_name)
+
+    # 绘制ROC
+    ## 获得得分
+    y_test_probability = svclassifier.decision_function(X_test)
+    # print(y_test_probability)
+
+    ## 获得真假率
+    fpr, tpr, threshold = roc_curve(y_test, y_test_probability)
+    # print(fpr)
+    # print(tpr)
+    # print(threshold)
+
+    # 预测评估
+    y_pred = svclassifier.predict(X_test)
+    test_pred = svclassifier.predict(pre_data)
+
+    # pd.set_option('display.max_columns', None)
+    # pd.set_option('display.max_rows', None)
+    # pd.set_option('max_colwidth', 10000000)
+    np.set_printoptions(threshold=sys.maxsize)
+
+
+    # print(fpr)
+    # print(tpr)
+    # print(threshold)
+
+    # fpr, tpr, threshold = roc_curve(y_test, y_pred)
+    # print(confusion_matrix(y_test, y_pred))
+    # print(classification_report(y_test, y_pred))
+    # print(y_pred)
+
+    # name_report_file = ''
+    # name__file= ''
+    # if is_sel == 0:
+    # ======  ======  ======  ======  ======  ======  ======
+    # file = open(RESULT_REPORT_PATH + str(c) + '_' + kernel + '_Report__' + PRESENT_TIME + '.txt', 'w') file.write(str(confusion_matrix(y_test, y_pred)))
+    # file.write('\n')
+    # file.write(str(classification_report(y_test, y_pred)))
+    # file.write('\n')
+    # file.write(str(y_pred))
+    # file.close()
+    #
+    # file = open(RESULT_DATA_PATH + str(c) + '_' + kernel + '_Out__' + PRESENT_TIME + '.txt', 'w')
+    # file.write(str(test_pred))
+    # file.close()
+
+
+    return y_test, y_test_probability, y_pred, test_pred, fpr, tpr, threshold
+
+# 保存验证数据产生的报告，反应模型情况
+def write_report(c, kernel, y_test, y_pred):
+    file = open(RESULT_REPORT_PATH + str(c) + '_' + kernel + '_Report__' + PRESENT_TIME + '.txt', 'w')
+    file.write(str(confusion_matrix(y_test, y_pred)))
+    file.write('\n')
+    file.write(str(classification_report(y_test, y_pred)))
+    file.write('\n')
+    file.write(str(y_pred))
+    file.close()
+
+# 保存测试数据分类结果
+def write_pred(c, kernel, test_pred):
+    file = open(RESULT_DATA_PATH + str(c) + '_' + kernel + '_Out__' + PRESENT_TIME + '.txt', 'w')
+    file.write(str(test_pred))
+    file.close()
+
+
+def show_graph(args, **kwargs):
+    c = args['C']
+    is_roc = args['is_graph_roc']
+    kernel = args['kernel']
+    y_te = kwargs['y_test']
+    y_t_pr = kwargs['y_test_probability']
+
+    if is_roc:
+        draw_roc(c, kernel, y_te, y_t_pr)
+
+# 绘图, ROC
+def draw_roc(c, kernel, y_test, y_test_probability):
+
     # 获得真假率
-    fpr, tpr, threshold = roc_curve(y_test, y_test_probility)
+    fpr, tpr, threshold = roc_curve(y_test, y_test_probability)
 
     # 绘制
     plt.ion()  # 开启interactive mode 成功的关键函数
-    fig_name = "let's play ROC__" + str(time.strftime("%Y-%m-%d %H.%M.%S", time.localtime())) + '.png'
+    fig_name = RESULT_GRAPH_PATH + str(c) + '_' + kernel + "_ROC__" + PRESENT_TIME + '.png'
     plt.figure(fig_name, figsize=(6, 6))
 
     # average time of each eat
