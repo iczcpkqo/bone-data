@@ -16,11 +16,11 @@ RESULT_DATA_PATH = "./result_data/"
 RESULT_REPORT_PATH = "./result_report/"
 RESULT_GRAPH_PATH = "./result_graph/"
 MODEL_PATH = "./trained_model/"
-PRESENT_TIME = str(time.strftime("%Y-%m-%d %H.%M.%S", time.localtime()))
+PRESENT_TIME = str(time.strftime("%Y-%m-%d %H.%M.%S", time.localtime(time.time())))
 
 
 def run():
-    # setting
+    # SETTING AND ON-OFF
     args = {'is_train': True,
             'is_print_report': True,
             'is_print_pred': True,
@@ -28,11 +28,11 @@ def run():
             'is_probability': True,
             'is_graph_roc': True,
             'is_graph_auc': False,
-            'C': 0.5,
-            'test_size': 0.20,
+            'C': 0.75,
+            'test_size': 0.2,
             'pause_time': 0.00,
-            'kernel': 'Sigmoid',
-            'model_name': '0.5_SV_Sigmoid__2020-12-18 00.59.51.m',
+            'kernel': 'Polynomial',
+            'model_name': '0.5_SV_Sigmoid__2020-12-18 05.29.13.m',
             'train_data': 'train-io-tiny.txt',
             'test_data': 'test-in-tiny.txt',
             'train_col': ['D-1', 'D-2', 'D-3', 'D-4', 'D-5', 'D-6', 'D-7', 'D-8', 'D-9', 'D-10', 'D-11', 'D-12', 'class'],
@@ -40,17 +40,23 @@ def run():
 
     # get parameter
     c = args['C']
+    is_train = args['is_train']
 
     # for big_C in np.arange(0.1, 1.05, 0.1):
-    print(c)
+    print('laod the C='+str(c))
 
-    y_test, y_test_probability, y_pred, test_pred = run_train(args)
+    if is_train:
+        y_test, y_test_probability, y_pred, test_pred = run_train(args)
+    elif not is_train:
+        y_test, y_test_probability, y_pred, test_pred = run_model(args)
 
     # 绘制ROC
     # draw_roc(args, y_test=y_test, y_test_probability=y_test_probability)
+    print('start draw graph')
     show_graph(args, y_test=y_test, y_test_probability=y_test_probability)
 
     # 保存数据
+    print('save data')
     save_data(args, y_test=y_test, y_pred=y_pred, test_pred=test_pred)
 
 # for i in range(2, 3):
@@ -63,6 +69,8 @@ def run():
     # y_test = kwargs['y_test']
     # y_pred = kwargs['y_pred']
     # test_pred = kwargs['test_pred']
+
+
 
 def run_train(args):
     c = args['C']
@@ -84,18 +92,22 @@ def run_train(args):
     pre_colnames = te_co
 
     # Read dataset to pandas dataframe
+    print('read data file')
     train_data = pd.read_csv(url, names=colnames, sep=' ')
     pre_data = pd.read_csv(pre_url, names=pre_colnames, sep=' ')
 
     # 预处理
+    print('drop data column')
     X = train_data.drop(tr_co[-1], axis=1)
     y = train_data[tr_co[-1]]
 
     # 分离数据
+    print('split data')
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=te_si)
 
     # 选分类器
     ## 高斯
+    print('select kernel')
     if kernel == 'Gaussian':
         print(kernel)
         svclassifier = SVC(kernel='rbf', probability=proba, C=c)
@@ -112,13 +124,16 @@ def run_train(args):
         svclassifier = SVC(kernel='sigmoid', probability=proba, C=c)
 
     # 训练
+    print('fit train data')
     svclassifier.fit(X_train, y_train)
 
     # 保存模型
+    print('save model')
     joblib.dump(svclassifier, MODEL_PATH + str(c) + '_SV_' + kernel + '__' + PRESENT_TIME + '.m')
 
     # 绘制ROC
     ## 获得得分
+    print('get probability')
     y_test_probability = svclassifier.decision_function(X_test)
     # print(y_test_probability)
 
@@ -129,7 +144,9 @@ def run_train(args):
     # print(threshold)
 
     # 预测评估
+    print('predict y_pred')
     y_pred = svclassifier.predict(X_test)
+    print('predict test_pred')
     test_pred = svclassifier.predict(pre_data)
 
     # pd.set_option('display.max_columns', None)
@@ -170,7 +187,7 @@ def run_model(args):
     is_roc = args['is_graph_roc']
     te_co = args['test_col']
     te_da = args['test_data']
-    te_si = 0.0
+    te_si = args['test_size']
     tr_co = args['train_col']
     tr_da = args['train_data']
     kernel = args['kernel']
@@ -187,23 +204,28 @@ def run_model(args):
     pre_colnames = te_co
 
     # Read dataset to pandas dataframe
+    print('read data file')
     train_data = pd.read_csv(url, names=colnames, sep=' ')
     pre_data = pd.read_csv(pre_url, names=pre_colnames, sep=' ')
 
     # 预处理
+    print('drop data column')
     X = train_data.drop(tr_co[-1], axis=1)
     y = train_data[tr_co[-1]]
 
     # 分离数据
+    print('split data')
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=te_si)
 
     # 调用模型
+    print('start joblib')
     svclassifier = joblib.load(MODEL_PATH + model_name)
 
     # 绘制ROC
     ## 获得得分
     y_test_probability = None
     if is_roc:
+        print('take probability')
         y_test_probability = svclassifier.decision_function(X_test)
     # print(y_test_probability)
 
@@ -214,7 +236,9 @@ def run_model(args):
     # print(threshold)
 
     # 预测
+    print('predict y_pred & test_pred')
     y_pred = svclassifier.predict(X_test)
+    print('predict test_pred')
     test_pred = svclassifier.predict(pre_data)
 
     # pd.set_option('display.max_columns', None)
